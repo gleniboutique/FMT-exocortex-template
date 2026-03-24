@@ -5,6 +5,15 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-03-24
+
+### Added
+- **dt-collect.sh plugin-архитектура** — ядро (L3) содержит 11 стандартных коллекторов, `collectors.d/*.sh` — точка расширения для персональных (L4) коллекторов. Plugin loader автоматически source'ит файлы и route'ит JSON по TARGET-секциям
+- **collectors.d/README.md** — документация формата плагинов (COLLECTOR/TARGET headers, формат функций)
+- **6 новых коллекторов в ядре** — multiplier (DayPlan budget), WP-REGISTRY stats, Pack entities, fleeting notes, scheduler reports health
+- **2 новых JSONB-секции** — `2_8_ecosystem`, `2_9_knowledge` (через плагины)
+- **portable_date_offset** — кроссплатформенная обёртка для `date -v` (macOS + Linux)
+
 ## [0.13.5] — 2026-03-22
 
 ### Changed
