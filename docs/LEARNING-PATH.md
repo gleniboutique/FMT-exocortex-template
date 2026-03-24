@@ -1425,7 +1425,7 @@ gh repo create PACK-my-domain --private --source=. --push
 <details open>
 <summary><b>11. Быстрый справочник</b></summary>
 
-> **Архитектура FAQ:** Практические вопросы («как сделать») — здесь. Доменные вопросы («что такое», «зачем») — [DP.IWE.002 §11](../../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#11-частые-вопросы-faq) (source-of-truth для бота).
+> **Архитектура FAQ:** Практические вопросы («как сделать») — здесь. Доменные вопросы («что такое», «зачем») — [DP.IWE.002 §11](../../PACK-digital-platform/pack/digital-platform/02-domain-entities/DP.IWE.002-iwe-template-and-setup.md#11-частые-вопросы-faq) (source-of-truth для бота).
 
 ### Протоколы и рабочий процесс
 
