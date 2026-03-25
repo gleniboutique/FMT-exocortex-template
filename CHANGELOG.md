@@ -5,6 +5,18 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] — 2026-03-25
+
+### Changed
+- **WeekReport deprecated** — итоги недели теперь записываются в секцию «Итоги W{N}» внутри WeekPlan. Отдельный файл WeekReport больше не создаётся. АрхГейт 8.9 (62/70)
+- **week-review.md** — пишет секцию в WeekPlan, не создаёт файл
+- **session-prep.md** — читает секцию из WeekPlan, не ищет файл WeekReport
+
+### Updated
+- docs/LEARNING-PATH, USE-CASES, SETUP-GUIDE, onboarding-guide — убран WeekReport
+- roles/strategist/README, seed/strategy/CLAUDE.md — WeekReport помечен deprecated
+- synchronizer/scripts/templates/strategist.sh — ищет WeekPlan вместо WeekReport
+
 ## [0.15.2] — 2026-03-24
 
 ### Changed
