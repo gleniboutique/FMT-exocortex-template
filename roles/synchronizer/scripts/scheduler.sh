@@ -10,48 +10,16 @@
 
 set -euo pipefail
 
-# Предотвращаем сон пока скрипт работает
-# macOS: caffeinate -diu (idle+display+user, работает на батарее; -s НЕ используем — игнорируется при OBC→BATT)
-# Linux: systemd-inhibit (если доступен)
-if [[ "$(uname)" == "Darwin" ]]; then
-    caffeinate -diu -w $$ &
-elif command -v systemd-inhibit &>/dev/null; then
-    systemd-inhibit --what=idle:sleep --who=scheduler --why="agent dispatch" --mode=block sleep infinity &
-    _INHIBIT_PID=$!
-    trap 'kill $_INHIBIT_PID 2>/dev/null' EXIT
-fi
-
-# Cross-platform date offset: portable_date_offset <days_back> <format>
-portable_date_offset() {
-    local days="$1"
-    local fmt="${2:-%Y-%m-%d}"
-    date -v-${days}d +"$fmt" 2>/dev/null || date -d "$days days ago" +"$fmt" 2>/dev/null
-}
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SYNC_DIR="$(dirname "$SCRIPT_DIR")"
 STATE_DIR="$HOME/.local/state/exocortex"
 LOG_DIR="$HOME/logs/synchronizer"
 LOG_FILE="$LOG_DIR/scheduler-$(date +%Y-%m-%d).log"
 
-ROLES_DIR="{{WORKSPACE_DIR}}/FMT-exocortex-template/roles"
+ROLES_DIR="/c/Users/pc/Github/FMT-exocortex-template/roles"
+STRATEGIST_SH="$ROLES_DIR/strategist/scripts/strategist.sh"
+EXTRACTOR_SH="$ROLES_DIR/extractor/scripts/extractor.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
-
-# Role runner discovery: reads runner path from role.yaml, fallback to convention
-get_role_runner() {
-    local role="$1"
-    local yaml="$ROLES_DIR/$role/role.yaml"
-    if [ -f "$yaml" ]; then
-        local runner
-        runner=$(grep '^runner:' "$yaml" | sed 's/runner: *//' | tr -d '"' | tr -d "'")
-        [ -n "$runner" ] && echo "$ROLES_DIR/$role/$runner" && return
-    fi
-    # Fallback: convention-based path
-    echo "$ROLES_DIR/$role/scripts/$role.sh"
-}
-
-STRATEGIST_SH="$(get_role_runner strategist)"
-EXTRACTOR_SH="$(get_role_runner extractor)"
 
 # Текущее время
 HOUR=$(date +%H)
@@ -109,7 +77,7 @@ cleanup_state() {
 # Разделяет архивацию (мгновенно) и генерацию (15+ мин Claude Code).
 # Гарантирует: даже если генерация ещё не началась, старый план не висит в current/.
 pre_archive_dayplan() {
-    local strategy_dir="{{WORKSPACE_DIR}}/DS-strategy"
+    local strategy_dir="$HOME/Github/DS-strategy"
     local archive_dir="$strategy_dir/archive/day-plans"
     local moved=0
 
@@ -129,10 +97,7 @@ pre_archive_dayplan() {
 
     if [ "$moved" -gt 0 ]; then
         git -C "$strategy_dir" pull --rebase 2>/dev/null || true
-        # ВАЖНО: добавляем ТОЛЬКО перемещённые файлы, не всю директорию.
-        # `git add current/` может подхватить грязные unstaged файлы (баг 21 мар 2026).
-        git -C "$strategy_dir" add -- archive/day-plans/ 2>/dev/null || true
-        git -C "$strategy_dir" add -u -- current/ 2>/dev/null || true
+        git -C "$strategy_dir" add current/ archive/day-plans/ 2>/dev/null || true
         git -C "$strategy_dir" commit -m "chore: archive $moved old DayPlan(s)" 2>/dev/null || true
         git -C "$strategy_dir" push 2>/dev/null || true
         log "pre-archive: committed and pushed ($moved file(s))"
@@ -181,7 +146,7 @@ dispatch() {
         ran=1
     elif (( 10#$HOUR < 12 )); then
         local yesterday
-        yesterday=$(portable_date_offset 1)
+        yesterday=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d 2>/dev/null || true)
         if [ -n "$yesterday" ] && [ ! -f "$STATE_DIR/strategist-note-review-$yesterday" ]; then
             log "→ strategist note-review (catch-up for yesterday $yesterday)"
             if "$STRATEGIST_SH" note-review >> "$LOG_FILE" 2>&1; then
@@ -200,17 +165,6 @@ dispatch() {
             mark_done "synchronizer-code-scan"
         else
             log "WARN: code-scan failed (will retry next dispatch)"
-        fi
-        ran=1
-    fi
-
-    # --- Синхронизатор: dt-collect (после code-scan) ---
-    if ! ran_today "synchronizer-dt-collect"; then
-        log "→ synchronizer dt-collect (hour=$HOUR)"
-        if "$SCRIPT_DIR/dt-collect.sh" >> "$LOG_FILE" 2>&1; then
-            mark_done "synchronizer-dt-collect"
-        else
-            log "WARN: dt-collect failed (will retry next dispatch)"
         fi
         ran=1
     fi

@@ -4,39 +4,13 @@
 
 set -e
 
-# Предотвращаем сон: -i (idle, работает на батарее) -d (display) -u (user activity)
-# Флаг -s (system sleep) не используем — он НЕ работает на батарее (OBC может переключить профиль)
-caffeinate -diu -w $$ &
-
 # Конфигурация
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-WORKSPACE="$HOME/IWE/DS-strategy"
+WORKSPACE="$HOME/Github/DS-strategy"
 PROMPTS_DIR="$REPO_DIR/prompts"
 LOG_DIR="$HOME/logs/strategist"
-CLAUDE_PATH="{{CLAUDE_PATH}}"
-CLAUDE_TIMEOUT=1800  # 30 мин — защита от зависания Claude CLI
-
-# macOS не имеет GNU timeout — используем perl fallback
-if ! command -v timeout &>/dev/null; then
-    timeout() {
-        local duration="$1"; shift
-        perl -e '
-            use POSIX ":sys_wait_h";
-            my $timeout = shift @ARGV;
-            my $pid = fork();
-            if ($pid == 0) { exec @ARGV; die "exec failed: $!"; }
-            eval {
-                local $SIG{ALRM} = sub { kill "TERM", $pid; die "timeout\n"; };
-                alarm $timeout;
-                waitpid($pid, 0);
-                alarm 0;
-            };
-            if ($@ && $@ eq "timeout\n") { waitpid($pid, WNOHANG); exit 124; }
-            exit ($? >> 8);
-        ' "$duration" "$@"
-    }
-fi
+CLAUDE_PATH="/c/Users/pc/AppData/Roaming/npm/claude"
 
 # Создаём папку для логов
 mkdir -p "$LOG_DIR"
@@ -61,7 +35,17 @@ notify() {
 
 notify_telegram() {
     local scenario="$1"
-    "$HOME/IWE/DS-IT-systems/DS-ai-systems/synchronizer/scripts/notify.sh" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
+    "/c/Users/pc/Github/FMT-exocortex-template/roles/synchronizer/scripts/notify.sh" strategist "$scenario" >> "$LOG_FILE" 2>&1 || true
+}
+
+fetch_wakatime_data() {
+    local mode="$1"  # "day" or "week"
+    local fetch_script="$SCRIPT_DIR/fetch-wakatime.sh"
+    if [ -x "$fetch_script" ]; then
+        "$fetch_script" "$mode" 2>/dev/null || echo "(WakaTime данные недоступны)"
+    else
+        echo "(fetch-wakatime.sh не найден)"
+    fi
 }
 
 run_claude() {
@@ -77,37 +61,30 @@ run_claude() {
     local prompt
     prompt=$(cat "$command_path")
 
-    # Inject current date + day of week (prevents LLM calendar arithmetic errors)
-    local ru_date_context
-    ru_date_context=$(python3 -c "
-import datetime
-days = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье']
-months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
-d = datetime.date.today()
-print(f'{d.day} {months[d.month-1]} {d.year}, {days[d.weekday()]}')
-")
-    prompt="[Системный контекст] Сегодня: ${ru_date_context}. ISO: ${DATE}. День недели №${DAY_OF_WEEK} (1=Пн..7=Вс). ЯЗЫК: отвечай ТОЛЬКО на русском. Украинский, английский и другие языки запрещены.
-
-${prompt}"
+    # Подставляем WakaTime данные в промпт (если есть плейсхолдеры)
+    if echo "$prompt" | grep -q '{{WAKATIME_DAY}}'; then
+        log "Fetching WakaTime data (day mode)"
+        local waka_day
+        waka_day=$(fetch_wakatime_data "day")
+        prompt="${prompt//\{\{WAKATIME_DAY\}\}/$waka_day}"
+    fi
+    if echo "$prompt" | grep -q '{{WAKATIME_WEEK}}'; then
+        log "Fetching WakaTime data (week mode)"
+        local waka_week
+        waka_week=$(fetch_wakatime_data "week")
+        prompt="${prompt//\{\{WAKATIME_WEEK\}\}/$waka_week}"
+    fi
 
     log "Starting scenario: $command_file"
     log "Command file: $command_path"
-    log "Date context: $ru_date_context"
 
     cd "$WORKSPACE"
 
-    # Запуск Claude Code с содержимым команды как промпт (с timeout-защитой)
-    local rc=0
-    timeout "$CLAUDE_TIMEOUT" "$CLAUDE_PATH" --dangerously-skip-permissions \
+    # Запуск Claude Code с содержимым команды как промпт
+    "$CLAUDE_PATH" --dangerously-skip-permissions \
         --allowedTools "Read,Write,Edit,Glob,Grep,Bash" \
         -p "$prompt" \
-        >> "$LOG_FILE" 2>&1 || rc=$?
-
-    if [ $rc -eq 124 ]; then
-        log "WARN: Claude CLI timed out after ${CLAUDE_TIMEOUT}s for scenario: $command_file"
-    elif [ $rc -ne 0 ]; then
-        log "WARN: Claude CLI exited with code $rc for scenario: $command_file"
-    fi
+        >> "$LOG_FILE" 2>&1
 
     log "Completed scenario: $command_file"
 
@@ -145,32 +122,17 @@ acquire_lock() {
     local lockfile="$LOCK_DIR/${scenario}.${DATE}.lock"
     if ! mkdir "$lockfile" 2>/dev/null; then
         log "SKIP: $scenario already running (lock exists: $lockfile)"
-        exit 2  # non-zero → scheduler won't mark_done
+        exit 0
     fi
     # Auto-cleanup lock on exit
     trap "rmdir '$lockfile' 2>/dev/null" EXIT
 }
 
-# Читаем strategy_day из конфига (L4 Personal)
-RHYTHM_CONFIG="$HOME/.claude/projects/-Users-$(whoami)-IWE/memory/day-rhythm-config.yaml"
-STRATEGY_DAY_NAME=$(grep 'strategy_day:' "$RHYTHM_CONFIG" 2>/dev/null | awk '{print $2}' || echo "monday")
-# Конвертируем имя дня в номер (1=Mon..7=Sun)
-case "$STRATEGY_DAY_NAME" in
-    monday)    STRATEGY_DAY_NUM=1 ;;
-    tuesday)   STRATEGY_DAY_NUM=2 ;;
-    wednesday) STRATEGY_DAY_NUM=3 ;;
-    thursday)  STRATEGY_DAY_NUM=4 ;;
-    friday)    STRATEGY_DAY_NUM=5 ;;
-    saturday)  STRATEGY_DAY_NUM=6 ;;
-    sunday)    STRATEGY_DAY_NUM=7 ;;
-    *)         STRATEGY_DAY_NUM=1 ;;  # fallback: monday
-esac
-
 # Определяем какой сценарий запускать
 case "$1" in
     "morning")
-        # Определяем нужный сценарий: strategy_day → session-prep, иначе → day-plan
-        if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
+        # Определяем нужный сценарий
+        if [ "$DAY_OF_WEEK" -eq 1 ]; then
             SCENARIO="session-prep"
         else
             SCENARIO="day-plan"
@@ -183,8 +145,8 @@ case "$1" in
             exit 0
         fi
 
-        if [ "$DAY_OF_WEEK" -eq "$STRATEGY_DAY_NUM" ]; then
-            log "Strategy day ($STRATEGY_DAY_NAME): running session prep"
+        if [ "$DAY_OF_WEEK" -eq 1 ]; then
+            log "Monday morning: running session prep"
             run_claude "session-prep"
             notify_telegram "session-prep"
         else
@@ -199,17 +161,14 @@ case "$1" in
         notify_telegram "evening"
         ;;
     "week-review")
-        acquire_lock "week-review"
-        if already_ran_today "week-review"; then
-            log "SKIP: week-review already completed today"
-            exit 0
-        fi
         log "Sunday: running week review"
         run_claude "week-review"
-        # Fallback push for Knowledge Index (week-review creates a post there)
-        KI_REPO="$HOME/IWE/DS-Knowledge-Index"
-        if git -C "$KI_REPO" log --oneline -1 --since="1 hour ago" --grep="week-review" 2>/dev/null | grep -q .; then
-            git -C "$KI_REPO" push >> "$LOG_FILE" 2>&1 && log "Pushed Knowledge Index (fallback)" || log "WARN: KI push failed"
+        # Fallback push for Knowledge Index (optional, skip if repo doesn't exist)
+        KI_REPO="/c/Users/pc/Github/DS-Knowledge-Index-gleniboutique"
+        if [ -d "$KI_REPO/.git" ]; then
+            if git -C "$KI_REPO" log --oneline -1 --since="1 hour ago" --grep="week-review" 2>/dev/null | grep -q .; then
+                git -C "$KI_REPO" push >> "$LOG_FILE" 2>&1 && log "Pushed Knowledge Index (fallback)" || log "WARN: KI push failed"
+            fi
         fi
         notify_telegram "week-review"
         ;;
@@ -226,45 +185,23 @@ case "$1" in
     "note-review")
         acquire_lock "note-review"
         log "Evening: running note review"
-        # Canary: count bold notes before (exclude 🔄 — deferred ideas stay bold by design)
+        # Canary: count bold notes before
         FLEETING="$WORKSPACE/inbox/fleeting-notes.md"
         BOLD_BEFORE=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || echo 0)
-        BOLD_NEW_BEFORE=$(grep '^\*\*' "$FLEETING" 2>/dev/null | grep -v '🔄' | grep -c '.' || echo 0)
-        log "Canary: $BOLD_BEFORE bold total ($BOLD_NEW_BEFORE new, $(( BOLD_BEFORE - BOLD_NEW_BEFORE )) deferred 🔄)"
+        log "Canary: $BOLD_BEFORE bold notes before note-review"
 
         run_claude "note-review"
 
-        # Canary: count bold notes after — only NEW bold (without 🔄) should decrease
+        # Canary: count bold notes after — if same or more, Step 10 likely failed
         BOLD_AFTER=$(grep -c '^\*\*' "$FLEETING" 2>/dev/null || echo 0)
-        BOLD_NEW_AFTER=$(grep '^\*\*' "$FLEETING" 2>/dev/null | grep -v '🔄' | grep -c '.' || echo 0)
-        log "Canary: $BOLD_AFTER bold total ($BOLD_NEW_AFTER new)"
-        NON_BOLD=$(grep -c '^[^*#>-]' "$FLEETING" 2>/dev/null || echo 0)
-        log "Non-bold content lines: $NON_BOLD"
-        if [ "$BOLD_NEW_AFTER" -ge "$BOLD_NEW_BEFORE" ] && [ "$BOLD_NEW_BEFORE" -gt 0 ]; then
-            log "WARN: Note-Review Step 10 may have failed — new bold notes did not decrease ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER)"
-        fi
-
-        # Deterministic cleanup: archive non-bold, non-🔄 notes (safety net for LLM Step 10)
-        log "Running deterministic cleanup..."
-        CLEANUP_OUTPUT=$(python3 "$SCRIPT_DIR/cleanup-processed-notes.py" 2>&1) || true
-        log "Cleanup: $CLEANUP_OUTPUT"
-
-        # If cleanup made changes, commit and push
-        if ! git -C "$WORKSPACE" diff --quiet -- inbox/fleeting-notes.md archive/notes/Notes-Archive.md 2>/dev/null; then
-            git -C "$WORKSPACE" add inbox/fleeting-notes.md archive/notes/Notes-Archive.md
-            git -C "$WORKSPACE" commit -m "chore: auto-cleanup processed notes from fleeting-notes.md" >> "$LOG_FILE" 2>&1 || true
-            git -C "$WORKSPACE" pull --rebase >> "$LOG_FILE" 2>&1 && log "Cleanup: pulled (rebase)" || log "WARN: cleanup pull --rebase failed"
-            git -C "$WORKSPACE" push >> "$LOG_FILE" 2>&1 && log "Cleanup: pushed" || log "WARN: cleanup push failed"
-        else
-            log "Cleanup: no changes to commit"
-        fi
-
-        # Alert if LLM failed AND cleanup was needed (only for NEW bold, not deferred 🔄)
-        if [ "$BOLD_NEW_AFTER" -ge "$BOLD_NEW_BEFORE" ] && [ "$BOLD_NEW_BEFORE" -gt 0 ]; then
+        log "Canary: $BOLD_AFTER bold notes after note-review (was $BOLD_BEFORE)"
+        if [ "$BOLD_AFTER" -ge "$BOLD_BEFORE" ] && [ "$BOLD_BEFORE" -gt 0 ]; then
+            log "WARN: Note-Review Step 10 may have failed — bold notes did not decrease ($BOLD_BEFORE → $BOLD_AFTER)"
+            # Direct TG alert (bypass notify.sh templates)
             ENV_FILE="$HOME/.config/aist/env"
             if [ -f "$ENV_FILE" ]; then
                 set -a; source "$ENV_FILE"; set +a
-                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_NEW_BEFORE → $BOLD_NEW_AFTER new bold). Deterministic cleanup applied."
+                ALERT_TEXT="⚠️ <b>Note-Review canary</b>: Step 10 не сработал ($BOLD_BEFORE → $BOLD_AFTER bold notes). Проверь логи: ~/logs/strategist/"
                 ALERT_JSON=$(printf '%s' "$ALERT_TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
                 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
                     -H "Content-Type: application/json" \
