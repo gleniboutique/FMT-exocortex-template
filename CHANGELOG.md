@@ -5,6 +5,13 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.16.9] — 2026-03-28
+
+### Added
+- **scheduler.sh** — `TASK_TIMEOUT_SHORT` (300s) и `TASK_TIMEOUT_LONG` (1800s) для всех задач dispatch
+- **scheduler.sh** — macOS perl timeout fallback (нет GNU timeout)
+- **scheduler.sh** — AC sleep check (pmset) в dispatch() — предупреждение при sleep≠0 на зарядке
+
 ## [0.16.8] — 2026-03-28
 
 ### Added
