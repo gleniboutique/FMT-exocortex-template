@@ -5,6 +5,64 @@ All notable changes to FMT-exocortex-template will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [0.17.1] — 2026-03-28
+
+### Added
+- **day-open/SKILL.md** — БЛОКИРУЮЩЕЕ: пошаговое исполнение через TodoWrite. Каждый шаг = задача, переход только после отметки. Предотвращает пропуск шагов (carry-over, mandatory, запись) из-за загрязнения контекста (SOTA.002)
+- **protocol-open.md** — ссылка на пошаговое исполнение Day Open (аналогично Close)
+
+## [0.17.0] — 2026-03-28
+
+### Changed
+- **day-open/SKILL.md v1.1** — carry-over из вчерашнего DayPlan теперь обязательная логика (не конфиг-флаг). Убран `day_close.review_yesterday_close`
+- **day-open/SKILL.md** — алгоритм и шаблоны объединены в один файл. Шаг 2: приоритет входов (carry-over → WeekPlan → mandatory)
+- **day-open/SKILL.md** — `{{GOVERNANCE_REPO}}` вместо prose-текста (формализация)
+- **day-rhythm-config.yaml** — добавлен `calendar_ids: []` (Day Open запрашивает все календари или указанные)
+- **day-rhythm-config.yaml** — убран `day_close` (carry-over = часть алгоритма, не настройка)
+
+### Added
+- **day-open/SKILL.md §6** — ссылки на источники (URL) обязательны в секции «Мир»
+
+## [0.16.9] — 2026-03-28
+
+### Added
+- **scheduler.sh** — `TASK_TIMEOUT_SHORT` (300s) и `TASK_TIMEOUT_LONG` (1800s) для всех задач dispatch
+- **scheduler.sh** — macOS perl timeout fallback (нет GNU timeout)
+- **scheduler.sh** — AC sleep check (pmset) в dispatch() — предупреждение при sleep≠0 на зарядке
+
+## [0.16.8] — 2026-03-28
+
+### Added
+- **day-open/SKILL.md** — механизм `mandatory_daily_wps`: стратег читает из `day-rhythm-config.yaml` обязательные РП для каждого дня. Нет в WeekPlan → «Требует внимания»
+- **day-open/SKILL.md** — механизм `review_yesterday_close`: опциональное чтение Close прошлого дня при Day Open (carry-over, незакрытые вопросы)
+- **day-rhythm-config.yaml** — секции `mandatory_daily_wps` и `day_close` (закомментированные примеры)
+
+## [0.16.7] — 2026-03-27
+
+### Fixed
+- **hooks/close-gate-reminder.sh** — v3: hook теперь инжектирует БЛОКИРУЮЩУЮ инструкцию вызвать `/run-protocol` вместо напоминания «Read protocol-close.md». Устраняет пропуск шагов при ручном исполнении Close (АрхГейт 63/70)
+
+## [0.16.6] — 2026-03-27
+
+### Changed
+- **docs/onboarding** — актуализация onboarding-документов: IWE = ОС (не среда/платформа), 4 компонента (Ядро мышления, Культура работы, Модель мастерства, Сообщество), теории (ШСМ) + культура работы (14 элементов), экзотело вместо экзоскелета, инструменты = средства доставки
+- **docs/DATA-POLICY** — убраны несуществующие standard/personal, добавлена свобода данных (§6.1), два слоя доставки, актуальная структура (memory/, extensions/, params.yaml)
+
+## [0.16.5] — 2026-03-27
+
+### Changed
+- **docs** — синхронизация документации: README сценарии → ссылки на SC.001-SC.015 (USE-CASES.md), FAQ подписки унифицированы («при необходимости»), IWE-HELP роли уточнены (3 в шаблоне / 21 на платформе), CLAUDE.md §2 примечание про первую неделю, SETUP-GUIDE §1.3b пояснение про MCP и Pack-сущности
+
+## [0.16.4] — 2026-03-27
+
+### Changed
+- **notify-update.yml** — 3-уровневый фильтр уведомлений: (1) наличие коммитов, (2) наличие changelog с буллет-пунктами, (3) проверка значимости (ключевые слова, значимые файлы, ≥3 пунктов). Незначительные правки (только CLAUDE.md/memory/rules) больше не генерируют уведомления подписчикам
+
+## [0.16.3] — 2026-03-27
+
+### Changed
+- **seed/strategy/docs/Strategy.md** — переструктурирование шаблона: Фокус Q{N} (текущий квартал, details open) первым, затем Годовой план (фазы, roadmap, MAPSTRATEGIC, риски, Q итоги внутри). Убрана отдельная секция Q итоги и Риски
+
 ## [0.16.2] — 2026-03-25
 
 ### Changed

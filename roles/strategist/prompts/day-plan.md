@@ -89,15 +89,13 @@ git -C /c/Users/pc/Github/<repo> log --since="yesterday 00:00" --until="today 00
 > **ВАЖНО:** Используй `git cherry`, а НЕ `git log A..B`. Cherry-pick создаёт новые SHA — `git log` считает их «отсутствующими», хотя содержимое идентичное. `git cherry` сравнивает по patch-id (содержимому).
 
 ```bash
-# Коммиты на pilot, отсутствующие на prod (+ = реально отсутствует, - = уже cherry-picked)
-git -C {{WORKSPACE_DIR}}/DS-IT-systems/aist_pilot_bot cherry -v new-architecture pilot 2>/dev/null | grep '^\+'
-# Коммиты на prod, отсутствующие на pilot (обратное направление)
-git -C {{WORKSPACE_DIR}}/DS-IT-systems/aist_pilot_bot cherry -v pilot new-architecture 2>/dev/null | grep '^\+'
+# Пример: проверка рассинхрона веток (замените путь и имена веток на свои)
+# git -C {{WORKSPACE_DIR}}/your-org/your-bot cherry -v main develop 2>/dev/null | grep '^\+'
 ```
 
 - Если есть коммиты с `+` в любом направлении → добавить в DayPlan секцию с ТОЧНЫМ числом:
   ```
-  **🤖 Бот: рассинхрон веток:** N коммитов на pilot (не на prod), M коммитов на prod (не на pilot). Команда для синхронизации: «мержи на прод».
+  **Рассинхрон веток:** N коммитов на develop (не на main), M коммитов на main (не на develop). Команда для синхронизации: «мержи на прод».
   ```
 - Если коммитов с `+` нет → не включать секцию (ветки синхронизированы)
 
