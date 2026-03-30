@@ -20,6 +20,11 @@ if [ -f "$ENV_FILE" ]; then
     set -a; source "$ENV_FILE"; set +a
 fi
 
+# Fallback: read from ~/.wakatime.cfg
+if [ -z "$WAKATIME_API_KEY" ] && [ -f "$HOME/.wakatime.cfg" ]; then
+    WAKATIME_API_KEY=$(grep -m1 'api_key' "$HOME/.wakatime.cfg" | sed 's/.*=\s*//' | tr -d '[:space:]')
+fi
+
 if [ -z "$WAKATIME_API_KEY" ]; then
     echo "WAKATIME_API_KEY not set"
     exit 0  # graceful — don't break strategist if no key

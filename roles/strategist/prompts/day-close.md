@@ -26,6 +26,16 @@ git -C /c/Users/pc/Github/<repo> log --since="today 00:00" --oneline --no-merges
 - Определи статус каждого затронутого РП: done / partial / not started
 - Выведи итоги на экран (не в файл)
 
+### 1b. WakaTime (физическое время)
+
+```bash
+bash /c/Users/pc/Github/FMT-exocortex-template/roles/strategist/scripts/fetch-wakatime.sh today
+```
+
+- Показать итого + по проектам
+- Рассчитать мультипликатор: бюджет закрытых РП / WakaTime время
+- Если WakaTime недоступен — пропустить шаг молча
+
 ### 2. Обновить WeekPlan
 
 Найди текущий `WeekPlan W*.md` в `DS-strategy/current/` и обнови:
@@ -74,6 +84,11 @@ cp ~/.claude/projects/-c-Users-pc-Github/memory/*.md /c/Users/pc/Github/DS-strat
 
 Коммиты: N в M репо
 - repo-name: N коммитов (краткое описание)
+
+WakaTime: Xh Ym физического времени
+- Проект 1: Xh Ym
+- Проект 2: Xh Ym
+Мультипликатор: ~N.Nx (бюджет РП / WakaTime)
 
 РП обновлены в WeekPlan:
 - #N: статус → новый статус
